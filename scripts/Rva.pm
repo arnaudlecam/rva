@@ -19,6 +19,8 @@ sub new {
   $self->{cfgDir} = "RVA";
   $self->{varDir} = "D:/web.var/geo/RVA";
   $self->{osm_commentaire} = 'maj Keolis novembre 2014';
+# le fichier avec la liste des communes
+  $self->{f_rm} = $self->{varDir} . "/rva_communes_rm.csv";
 #  confess  Dumper $attr;
   bless($self, $class);
   $self->{oAPI} = new OsmApi();

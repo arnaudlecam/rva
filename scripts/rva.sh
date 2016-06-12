@@ -113,14 +113,14 @@ BANO_dl() {
 #f INSEE_count:
 INSEE_count() {
   LOG "INSEE_count debut"
-  grep "^${insee}" /d/web.var/geo/RVA/bano-35.csv | wc -l
-  grep ";${insee};" /d/web.var/geo/RVA/voies_adresses_csv/donnees/rva_adresses.csv | wc -l
+  grep "^${insee}" ${VarDir}/bano-35.csv | wc -l
+  grep ";${insee};" ${VarDir}/voies_adresses_csv/donnees/rva_adresses.csv | wc -l
   LOG "INSEE_count fin"
 }
 #F RM: enchainement des traitements pour les communes de Rennes Métropole
 RM() {
   LOG "RM debut"
-  tail -n +2 /d/web.var/geo/RVA/rva_communes_rm.csv | \
+  tail -n +2 ${VarDir}/rva_communes_rm.csv | \
   while  IFS=";" read insee commune code_postal longitude_radian latitude_radian; do
     echo $insee $commune
     perl scripts/rva.pl --insee ${insee} --DEBUG 1 --DEBUG_GET 1 -- adresses osm_insee
@@ -132,10 +132,13 @@ RM() {
 
   LOG "RM fin"
 }
+#f INC:
 INC() {
-  ls -l /d/web.var/geo/RVA/osm_voies_inc_*.csv
-  echo "[ -f RVA/${insee}_osm2rva.csv ] || cp /d/web.var/geo/RVA/osm_voies_inc_${insee}.csv RVA/${insee}_osm2rva.csv"
-  echo "grep -i "^${insee}.*Sedar" /D/web.var/geo/RVA/voies_adresses_csv/donnees/rva_voies.csv"
+  LOG "INC debut"
+  ls -l ${CFG}/osm_voies_inc_*.csv
+  echo "[ -f RVA/${insee}_osm2rva.csv ] || cp ${VarDir}/osm_voies_inc_${insee}.csv RVA/${insee}_osm2rva.csv"
+  echo "grep -i "^${insee}.*Sedar" ${VarDir}/voies_adresses_csv/donnees/rva_voies.csv"
+  LOG "INC fin"
 }
 #F GIT: pour mettre à jour le dépot git
 GIT() {

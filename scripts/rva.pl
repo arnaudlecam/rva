@@ -53,6 +53,7 @@ our $varDir = "$Drive/web.var/geo/${cfgDir}";
     mkdir("$varDir");
   }
   our( $sp, $ssp, $insee, $DEBUG, $DEBUG_GET );
+  $sp = 'aide';
   $insee = '35051';
   $DEBUG = 1;  $DEBUG_GET = 1;
 #  $DEBUG = 0;  $DEBUG_GET = 0;
@@ -80,7 +81,7 @@ sub aide {
 }
 sub help {
   print <<'EOF';
-perl scripts/rva.pl adresses rva2osm
+perl scripts/rva.pl --DEBUG 1 --DEBUG_GET 1 --insee  35278 adresses osm_insee
 EOF
 
 }

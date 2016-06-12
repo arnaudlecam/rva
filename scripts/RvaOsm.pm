@@ -13,16 +13,16 @@ use Math::Polygon;
 sub osm_insee {
   my $self = shift;
   my $insee = $self->{insee};
-  my $hash_node = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;node(area.boundaryarea)['addr:housenumber']['addr:street'];out meta;", "$self->{cfgDir}/node_${insee}.osm");
-  my $hash_fantoir = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;way(area.boundaryarea)['ref:FR:FANTOIR'];out meta;", "$self->{cfgDir}/fantoir_${insee}.osm");
-  my $hash_way = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;(way(area.boundaryarea)['addr:housenumber']['addr:street'];>);out meta;", "$self->{cfgDir}/way_${insee}.osm");
+  my $hash_node = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;node(area.boundaryarea)['addr:housenumber']['addr:street'];out meta;", "$self->{varDir}/node_${insee}.osm");
+  my $hash_fantoir = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;way(area.boundaryarea)['ref:FR:FANTOIR'];out meta;", "$self->{varDir}/fantoir_${insee}.osm");
+  my $hash_way = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;(way(area.boundaryarea)['addr:housenumber']['addr:street'];>);out meta;", "$self->{varDir}/way_${insee}.osm");
   my $hash_rel = $self->{oOAPI}->osm_get("area['ref:INSEE'='${insee}']->.boundaryarea;
 rel(area.boundaryarea)[type=associatedStreet]->.associatedStreet;
 node(r.associatedStreet:'house')->.asHouseNode;
 way(r.associatedStreet:'house')->.asHouseWay;
 node(w.asHouseWay)->.asHouseWayNode;
 (.associatedStreet;.asHouseWay;.asHouseWayNode; .asHouseNode);
-out meta;", "$self->{cfgDir}/rel_${insee}.osm");
+out meta;", "$self->{varDir}/rel_${insee}.osm");
 # indexation des nodes
   my $nodes;
   for my $node ( (@{$hash_rel->{'node'}}, @{$hash_way->{'node'}})  ) {
@@ -125,7 +125,7 @@ sub osm_ref {
   my $insee = $self->{insee};
   my $hash = $self->{oOAPI}->osm_get("area['ref:INSEE'='$insee']->.boundaryarea;
 (node(area.boundaryarea)['source:addr:housenumber:ref'];way(area.boundaryarea)['source:addr:housenumber:ref']);
-out meta;", "$self->{cfgDir}/osm_ref.osm");
+out meta;", "$self->{varDir}/osm_ref.osm");
   my ($csv, $type, $refs);
   my $type = 'node';
   $csv .= sprintf("%s;%s;%s;%s;%s;%s;%s;%s", 'id', 'type', 'lon', 'lat', 'city', 'street', 'housenumber', 'ref');
@@ -262,8 +262,7 @@ sub osm_cpl {
   warn "osm_cpl()";
   my $insee = $self->{insee};
   warn "osm_cpl() --$insee--";
-  my $f_rm = $self->{varDir} . "/rva_communes_rm.csv";
-  $rm = csv_hash($f_rm, "code_insee", 'utf8', ";");
+  $rm = csv_hash($self->{f_rm}, "code_insee", 'utf8', ";");
   $commune = $rm->{$insee}->{commune};
   $code_postal = $rm->{$insee}->{code_postal};
   $osm_fantoir = csv_hash( $self->{varDir} . "/fantoir_${insee}.csv", "name", 'utf8', ";", 0);
@@ -470,7 +469,7 @@ sub osm_cpl {
       my $d =  haversine_distance_meters($nodes->{$node}->{lat}, $nodes->{$node}->{lon}, $Y_WGS84, $X_WGS84);
       if ( $d < 10 ) {
         $ko++;
-        if ( $self->{DEBUG} > 1 ) {
+        if ( $self->{DEBUG} > 2 ) {
           warn "$nodes->{$node}->{lat}, $nodes->{$node}->{lon}, $Y_WGS84, $X_WGS84, $d";
           warn $ligne;
           warn  $nodes->{$node}->{ligne};
@@ -479,6 +478,10 @@ sub osm_cpl {
     }
     if ( $ko > 0 ) {
       $rva_inc .= "$ligne\n";
+      $voies{$VOIE_NOM}->{nb}++;
+      if ( $self->{DEBUG} > 1 ) {
+        warn $ligne;
+      }
       next;
     }
     $osm .= $self->node_rva($ligne) . "\n";
@@ -560,6 +563,9 @@ sub voie_osm2rva {
     }
     for my $k ( keys %{$osm2rva} ) {
       my $v = $osm2rva->{$k}->{rva};
+      if ( $v =~ m{^\d+} ) {
+        next;
+      }
       if ( not defined $rva_voies_noms->{$v} ) {
         warn "adr_osm2rva() $k;$v";
 #        warn Dumper $rva_voies_noms;

@@ -9,7 +9,7 @@ use Data::Dumper;
 use English;
 sub wiki {
   my $self = shift;
-  my $f_rm = $self->{varDir} . "/rva_communes_rm.csv";
+  my $f_rm = $self->{cfgDir} . "/rva_communes_rm.csv";
   my $rm = csv_hash($f_rm, "code_insee", 'utf8', ";");
   my $wiki = <<'EOF';
 ==Les communes==

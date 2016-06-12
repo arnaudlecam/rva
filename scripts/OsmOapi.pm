@@ -67,7 +67,7 @@ sub get {
   my $url = sprintf('http://overpass-api.de/api/interpreter?data=[timeout:360];%s', $data);
 #  $url = sprintf('http://oapi-fr.openstreetmap.fr/oapi/interpreter?data=[timeout:360];%s', $data);
 #  $url = sprintf('http://overpass.osm.rambler.ru/cgi/interpreter?data=[timeout:360];%s', $data);
-  $url = sprintf('http://api.openstreetmap.fr/oapi/interpreter?data=[timeout:360][maxsize:1073741824];%s', $data);
+#  $url = sprintf('http://api.openstreetmap.fr/oapi/interpreter?data=[timeout:360][maxsize:1073741824];%s', $data);
   $self->{content} = '';
   my $nb_essai = 3;
   my $req = new HTTP::Request 'GET' => $url;
