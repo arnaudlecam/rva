@@ -164,6 +164,7 @@ scripts/OsmOapi.pm
 scripts/Rva.pm
 scripts/RvaOsm.pm
 scripts/RvaWiki.pm
+RVA/rva_communes_rm.csv
 EOF
   cat  <<'EOF' > /tmp/README.md
 # rva : OpenStreetMap et Rennes Métropole Voies Adresses
