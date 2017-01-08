@@ -54,7 +54,7 @@ our $varDir = "$Drive/web.var/geo/${cfgDir}";
   }
   our( $sp, $ssp, $insee, $DEBUG, $DEBUG_GET );
   $sp = 'aide';
-  $insee = '35051';
+  $insee = '35047';
   $DEBUG = 1;  $DEBUG_GET = 1;
 #  $DEBUG = 0;  $DEBUG_GET = 0;
 # pour le mode ligne de commandes (cli)
@@ -80,8 +80,15 @@ sub aide {
   help();
 }
 sub help {
-  print <<'EOF';
-perl scripts/rva.pl --DEBUG 1 --DEBUG_GET 1 --insee  35278 adresses osm_insee
+  print <<EOF;
+# interrogation via l'overpass pour une commune (code insee)
+perl scripts/rva.pl --DEBUG 1 --DEBUG_GET 1 --insee ${insee} adresses osm_insee
+# modification et création pour une commune (code insee) - mode test
+perl scripts/rva.pl --DEBUG 1 --DEBUG_GET 1 --insee ${insee} adresses osm_cpl
+# modification et création pour une commune (code insee) - mode réel
+perl scripts/rva.pl --DEBUG 0 --DEBUG_GET 1 --insee ${insee} adresses osm_cpl
+# recherche des références pour une commune (code insee) - mode réel
+perl scripts/rva.pl --DEBUG 1 --DEBUG_GET 1 --insee 35363 adresses osm_ref
 EOF
 
 }
@@ -101,6 +108,7 @@ sub _adresses {
     DEBUG_GET => $DEBUG_GET,
     insee => "$insee",
     cfgDir => "RVA",
+    seuil => 4,
     source => "data.rennes-metropole.fr - Année 2016",
     osm_commentaire => 'maj juin 2016',
   };

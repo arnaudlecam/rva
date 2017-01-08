@@ -41,6 +41,17 @@ sub fin {
 </osm>
 EOF
 }
+sub delete_tags {
+  my $self = shift;
+  my $osm = shift;
+  my $tag_keys = shift;
+  $osm =~ s{.*<(node|way|relation)}{<$1}sm;
+  $osm =~ s{</(node|way|relation)>.*}{</$1>}sm;
+  my @lignes = split(/\n/, $osm);
+  @lignes = grep ( !/tag k="($tag_keys)"/, @lignes);
+  $osm = join("\n", @lignes);
+  return $osm;
+}
 sub modify_latlon {
   my $self = shift;
   my $osm = shift;
@@ -91,7 +102,9 @@ sub node_stops {
   my $format = <<'EOF';
   <node lat="%s" lon="%s" id="%s">
     <tag k="highway" v="bus_stop"/>
+    <tag k="public_transport" v="platform"/>
     <tag k="name" v="%s"/>
+    <tag k="ref" v="%s"/>
     <tag k="ref" v="%s"/>
   </node>
 EOF
@@ -100,7 +113,7 @@ EOF
   for my $hashref ( @{$table} ) {
 #    confess Dumper $hashref;
     $self->{node_id}--;
-    $osm .= sprintf($format, $hashref->{stop_lat}, $hashref->{stop_lon}, $self->{node_id}, $hashref->{stop_name}, $hashref->{stop_id});
+    $osm .= sprintf($format, $hashref->{stop_lat}, $hashref->{stop_lon}, $self->{node_id}, $hashref->{stop_name}, $hashref->{stop_id}, $self->{k_ref}, $hashref->{stop_id});
   }
   $osm .= $self->fin();
   return $osm;
@@ -186,13 +199,15 @@ sub node_stop {
   my $format = <<'EOF';
   <node lat="%s" lon="%s" id="%s" timestamp="0" changeset="1" version="1">
     <tag k="highway" v="bus_stop"/>
+    <tag k="public_transport" v="platform"/>
     <tag k="name" v="%s"/>
     <tag k="ref" v="%s"/>
+    <tag k="ref:%s" v="%s"/>
     <tag k="source" v="%s"/>
   </node>
 EOF
   $self->{node_id}--;
-  return sprintf($format, $hash->{stop_lat}, $hash->{stop_lon}, $self->{node_id}, $hash->{stop_name}, $hash->{stop_id}, $self->{source});
+  return sprintf($format, $hash->{stop_lat}, $hash->{stop_lon}, $self->{node_id}, $hash->{stop_name}, $hash->{stop_id}, $self->{network}, $hash->{stop_id}, $self->{source});
 }
 #
 # suppression d'un node à partir des données osm
@@ -243,6 +258,7 @@ sub relation_route_bus {
   my $format = <<'EOF';
   <relation id="%s" timestamp="0" changeset="1" version="1">
     <tag k="ref" v="%s"/>
+    <tag k="ref:fr_star" v="%04d"/>
     <tag k="name" v="Bus Rennes Ligne %s Direction %s"/>
     <tag k="description" v="%s"/>
     <tag k="direction" v="%s"/>
@@ -253,12 +269,13 @@ sub relation_route_bus {
     <tag k="route" v="bus"/>
     <tag k="type" v="route"/>
     <tag k="colour" v="#%s"/>
+    <tag k="text_color" v="#%s"/>
     <tag k="source" v="%s"/>
   </relation>
 EOF
   $self->{relation_id}--;
-  return sprintf($format, $self->{relation_id}, $hash->{ref}, $hash->{ref}, $hash->{to}, $hash->{description}, $hash->{to}, $hash->{from} , $hash->{to}
-    , $hash->{trip}[0]->{route_color}, $self->{source} );
+  return sprintf($format, $self->{relation_id}, $hash->{ref}, $hash->{ref}, $hash->{ref}, $hash->{to}, xml_escape($hash->{description}), $hash->{to}, $hash->{from} , $hash->{to}
+    , $hash->{trip}[0]->{route_color}, $hash->{trip}[0]->{route_text_color}, $self->{source} );
 }
 #
 # création d'une relation type=route route=bus à partir des données GTFS
@@ -497,6 +514,10 @@ sub osm2hash {
     SuppressEmpty => ''
   );
 #  warn Dumper($hash);
+  if ( defined  $hash->{meta} ) {
+    warn "osm2hash() tags meta";
+    warn Dumper $hash->{meta};
+  }
   foreach my $relation (@{$hash->{relation}}) {
     $hash->{relations}->{$relation->{id}}++;
 #    confess Dumper $relation;

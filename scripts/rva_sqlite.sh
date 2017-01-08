@@ -42,6 +42,16 @@ _sqlite_rva_voies() {
   local f_csv="d:/web.var/geo/RVA/voies_adresses_csv/donnees/rva_voies.csv"
   _sqlite_csv2table ${table} ${f_csv} UTF-8 ';'
 }
+_sqlite_rva_voies_troncons() {
+  local table=rva_voies_troncons
+  local f_csv="d:/web.var/geo/RVA/voies_adresses_csv/donnees/rva_voies_troncons.csv"
+  _sqlite_csv2table ${table} ${f_csv} UTF-8 ';'
+}
+_sqlite_rva_troncons() {
+  local table=rva_troncons
+  local f_csv="d:/web.var/geo/RVA/voies_adresses_csv/donnees/rva_troncons.csv"
+  _sqlite_csv2table ${table} ${f_csv} UTF-8 ';'
+}
 _sqlite_overpass() {
   local table=overpass
   local f_csv="d:/web.var/geo/RVA/osm2csv.csv"

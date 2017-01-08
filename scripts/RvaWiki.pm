@@ -21,6 +21,7 @@ sub wiki {
 ! ref
 ! double
 ! bano
+! osm_mod
 ! osm_inc
 ! rva_inc
 EOF
@@ -37,6 +38,7 @@ EOF
     my $double = $self->file_wc($self->{varDir} . "/double_${insee}.csv");
     my $bano = $self->file_wc($self->{varDir} . "/bano-35.csv", "^$insee");
     my $osm_inc = $self->file_wc($self->{varDir} . "/osm_inc_${insee}.csv");
+    my $osm_mod = $self->file_wc($self->{varDir} . "/osm_voies_mod_${insee}.csv");
     my $rva_inc = $self->file_wc($self->{varDir} . "/rva_inc_${insee}.csv");
     $wiki .= <<EOF;
 |-
@@ -47,6 +49,7 @@ EOF
 | $ref
 | $double
 | $bano
+| $osm_mod
 | $osm_inc
 | $rva_inc
 EOF

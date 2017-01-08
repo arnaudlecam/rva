@@ -95,6 +95,12 @@ EOF
   _SHP_unzip
   LOG "RVA_dl fin VarDir: $VarDir"
 }
+RVA_db() {
+  DB rva_adresses
+  DB rva_voies
+  DB rva_troncons
+  DB rva_voies_troncons
+}
 #F BANO_dl: téléchargement du fichier bano
 BANO_dl() {
   LOG "BANO_dl debut"
@@ -117,9 +123,9 @@ INSEE_count() {
   grep ";${insee};" ${VarDir}/voies_adresses_csv/donnees/rva_adresses.csv | wc -l
   LOG "INSEE_count fin"
 }
-#F RM: enchainement des traitements pour les communes de Rennes Métropole
-RM() {
-  LOG "RM debut"
+#F JOUR: enchainement des traitements pour les communes de Rennes Métropole
+JOUR() {
+  LOG "JOUR debut ${VarDir}/rva_communes_rm.csv"
   tail -n +2 ${VarDir}/rva_communes_rm.csv | \
   while  IFS=";" read insee commune code_postal longitude_radian latitude_radian; do
     echo $insee $commune
@@ -130,14 +136,19 @@ RM() {
   perl scripts/rva.pl adresses wiki
   perl scripts/rva.pl adresses wiki_update
 
-  LOG "RM fin"
+  LOG "JOUR fin"
 }
 #f INC:
 INC() {
+  insee=35055
+  voie="Rue Simone de Beauvoir"
   LOG "INC debut"
   ls -l ${CFG}/osm_voies_inc_*.csv
   echo "[ -f RVA/${insee}_osm2rva.csv ] || cp ${VarDir}/osm_voies_inc_${insee}.csv RVA/${insee}_osm2rva.csv"
-  echo "grep -i "^${insee}.*Sedar" ${VarDir}/voies_adresses_csv/donnees/rva_voies.csv"
+  set -x
+  grep -i "^${insee}.*${voie}" ${VarDir}/voies_adresses_csv/donnees/rva_voies.csv
+  grep -i ";${insee};.*${voie}" ${VarDir}/voies_adresses_csv/donnees/rva_adresses.csv
+  grep -i "${voie}" ${VarDir}/osm_${insee}.csv
   LOG "INC fin"
 }
 #F GIT: pour mettre à jour le dépot git

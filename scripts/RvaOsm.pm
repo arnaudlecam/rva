@@ -68,10 +68,10 @@ out meta;", "$self->{varDir}/rel_${insee}.osm");
   $csv .= sprintf("%s;%s;%s;%s;%s;%s;%s;%s", 'id', 'type', 'lon', 'lat', 'insee', 'street', 'housenumber', 'ref');
 
   for my $node ( @{$hash_node->{'node'}} ) {
-#    if ( $node->{id} eq '4225380537') {
-#      warn "osm_i() " . Dumper $node;
-#    }
     $csv .= sprintf("\n%s;%s;%s;%s;%s;%s;%s;%s", $node->{id}, $type, $node->{lon}, $node->{lat}, $insee, $node->{tags}->{'addr:street'}, $node->{tags}->{'addr:housenumber'}, $node->{tags}->{'source:addr:housenumber:ref'});
+#    if ( $node->{id} eq '257377114') {
+#      warn "osm_insee() node " . Dumper $node;
+#    }
   }
   my $type = 'way';
   for my $way ( @{$hash_way->{'way'}} ) {
@@ -99,6 +99,10 @@ out meta;", "$self->{varDir}/rel_${insee}.osm");
       if ( defined $node->{tags}->{'addr:street'} ) {
         $name = $node->{tags}->{'addr:street'};
       }
+#      if ( $node->{id} eq '257377114') {
+#        warn "osm_insee() relation: $relation " . Dumper $node;
+#        exit;
+#      }
       $csv .= sprintf("\n%s;%s;%s;%s;%s;%s;%s;%s", $n, $node->{type}, $node->{lon}, $node->{lat}, $insee, $name, $node->{tags}->{'addr:housenumber'}, $node->{tags}->{'source:addr:housenumber:ref'});
     }
   }
@@ -125,14 +129,17 @@ sub osm_ref {
   my $insee = $self->{insee};
   my $hash = $self->{oOAPI}->osm_get("area['ref:INSEE'='$insee']->.boundaryarea;
 (node(area.boundaryarea)['source:addr:housenumber:ref'];way(area.boundaryarea)['source:addr:housenumber:ref']);
-out meta;", "$self->{varDir}/osm_ref.osm");
-  my ($csv, $type, $refs);
+out meta;", "$self->{varDir}/osm_ref_${insee}.osm");
+  my ($csv, $type, $refs, %type_id);
   my $type = 'node';
   $csv .= sprintf("%s;%s;%s;%s;%s;%s;%s;%s", 'id', 'type', 'lon', 'lat', 'city', 'street', 'housenumber', 'ref');
   my $level0 = '';
   my $double = "ref1,ref2";
+  my $osm_delete = '';
+
+  $type = 'node';
   for my $node ( @{$hash->{'node'}} ) {
-    $node->{type} = 'n';
+    $node->{type} = $type;
     my $ref = $node->{tags}->{'source:addr:housenumber:ref'};
     if ( $ref !~ m{^\d+$} ) {
 #      warn Dumper $node;
@@ -140,20 +147,47 @@ out meta;", "$self->{varDir}/osm_ref.osm");
       next;
     }
     if ( defined $refs->{$ref} ) {
+      if ( $node->{user} =~ m{(mga_geo|blue_prawn_script|Ergerzher)} && $node->{version} eq '1') {
+        $type_id{$node->{type} . "/" . $node->{id}}++;
+        next;
+      }
+      if ( $refs->{$ref}->{user} =~ m{(mga_geo|blue_prawn_script|Ergerzher)} && $refs->{$ref}->{version} eq '1') {
+        $type_id{$refs->{$ref}->{type} . "/" . $refs->{$ref}->{id}}++;
+        next;
+      }
       if ( $self->{DEBUG} > 1 ) {
+        warn "***";
         warn Dumper $node;
         warn Dumper $refs->{$ref};
       }
-      $level0 .= "n$node->{id},";
-      $double .= "\n$node->{type}$node->{id},$refs->{$ref}->{type}$refs->{$ref}->{id}";
+
+      $level0 .= "n$refs->{$ref}->{id},n$node->{id},";
+      $double .= "\n$node->{type}$node->{id},$refs->{$ref}->{type}$refs->{$ref}->{id},$node->{user},$node->{version},$refs->{$ref}->{user},$refs->{$ref}->{version}";
+#      last;
       next;
     }
     $refs->{$ref} = $node;
     $csv .= sprintf("\n%s;%s;%s;%s;%s;%s;%s;%s", $node->{id}, $type, $node->{lon}, $node->{lat}, $node->{tags}->{'addr:city'}, $node->{tags}->{'addr:street'}, $node->{tags}->{'addr:housenumber'}, $node->{tags}->{'source:addr:housenumber:ref'});
   }
+  warn "osm_ref() double nodes: " . scalar(keys %type_id);
+  $osm_delete = '';
+  for my $type_id ( sort keys %type_id) {
+    my ( $type, $id ) = ( $type_id =~ m{(\w+).(\d+)} );
+    if ( $self->{DEBUG} == 0 ) {
+      my $osm1 = $self->{oAPI}->get(sprintf("http://api.openstreetmap.org/api/0.6/%s/%s", $type, $id));
+      if ( $osm1 eq '' ) {
+        next;
+      }
+      my $hash1 = $self->{oAPI}->osm2hash($osm1);
+      $osm_delete .= $self->{oOSM}->node_delete($hash1->{node}[0]);
+    }
+  }
+#  confess $osm_delete;
+  $self->{oAPI}->changeset($osm_delete, "point adresse en double", 'delete');
+  undef %type_id;
   $type = 'way';
   for my $way ( @{$hash->{'way'}} ) {
-    $way->{type} = 'w';
+    $way->{type} = $type;
     my $ref = $way->{tags}->{'source:addr:housenumber:ref'};
     if ( $ref !~ m{^\d+$} ) {
 #      warn Dumper $way;
@@ -165,8 +199,17 @@ out meta;", "$self->{varDir}/osm_ref.osm");
         warn Dumper $way;
         warn Dumper $refs->{$ref};
       }
-      $level0 .= "w$way->{id},";
-      $double .= "\n$way->{type}$way->{id};$refs->{$ref}->{type}$refs->{$ref}->{id}";
+      if ( $refs->{$ref}->{type} =~ m{^n} && $refs->{$ref}->{user} eq 'mga_geo' && $refs->{$ref}->{version} eq '1') {
+        if ( $self->{DEBUG} > 1 ) {
+          warn Dumper $way;
+          warn Dumper $refs->{$ref};
+          confess "double mga";
+        }
+        $level0 .= substr($way->{type},0 , 1) . "$way->{id},";
+        $level0 .= substr($refs->{$ref}->{type},0 , 1) . "$refs->{$ref}->{id},";
+        $type_id{$refs->{$ref}->{type}."/".$refs->{$ref}->{id}}++;
+      }
+      $double .= "\n$way->{type}$way->{id};$refs->{$ref}->{type}$refs->{$ref}->{id},$way->{user},$way->{version},$refs->{$ref}->{user},$refs->{$ref}->{version}";
       next;
     }
     $csv .= sprintf("\n%s;%s;%s;%s;%s;%s;%s;%s", $way->{id}, $type, $way->{lon}, $way->{lat}, $way->{tags}->{'addr:city'}, $way->{tags}->{'addr:street'}, $way->{tags}->{'addr:housenumber'}, $way->{tags}->{'source:addr:housenumber:ref'});
@@ -181,6 +224,20 @@ out meta;", "$self->{varDir}/osm_ref.osm");
   open(DOUBLE, "> :utf8",  $f_double) or die "...() erreur:$! $f_double";
   print(DOUBLE $double);
   close(DOUBLE);
+  warn "osm_ref() double node/way: " . scalar(keys %type_id);
+  $osm_delete = '';
+  for my $type_id ( sort keys %type_id) {
+    my ( $type, $id ) = ( $type_id =~ m{(\w+).(\d+)} );
+    if ( $self->{DEBUG} == 0 ) {
+      my $osm1 = $self->{oAPI}->get(sprintf("http://api.openstreetmap.org/api/0.6/%s/%s", $type, $id));
+      if ( $osm1 eq '' ) {
+        next;
+      }
+      my $hash1 = $self->{oAPI}->osm2hash($osm1);
+      $osm_delete .= $self->{oOSM}->node_delete($hash1->{node}[0]);
+    }
+  }
+  $self->{oAPI}->changeset($osm_delete, "point adresse en double", 'delete');
   warn "osm_ref() fin $f_double";
 }
 #
@@ -310,22 +367,29 @@ sub osm_cpl {
   my $modify;
   my $nb_modify = 0;
   my $level0 = '';
-  my ($osm_inc, $rva_inc);
+  my ($osm_inc, $rva_inc, $type_id);
   my $f_csv = $self->{varDir} . "/osm_${insee}.csv";
+  warn "osm_cpl() f_csv: $f_csv";
   open(CSV, "< :utf8",  $f_csv) or die "...() erreur:$! $f_csv";
   $osm_inc = <CSV>;
+
   while ( my $ligne = <CSV> ) {
     chomp $ligne;
     my ($id, $type, $lon, $lat, $city, $street, $housenumber, $ref ) = split(";", $ligne);
     if ( $id !~ m{^\d} ) {
       next;
     }
+    if ( defined $type_id->{"${type}/${id}"} ) {
+      next;
+    }
+    $type_id->{"${type}/${id}"} = $.;
     if ( $street =~ m{^\s*$} ) {
       next;
     }
 # déjà référencé ?
     if ( $ref =~ m{^\d+$} ) {
       $osm_ref->{$ref} = $id;
+      $voies{$street}->{osm_ref}++;
       next;
     }
 # on mémorise
@@ -351,9 +415,9 @@ sub osm_cpl {
       my $l = substr($type,0,1) . $id . ',';
       $l = "http://www.openstreetmap.org/edit?editor=id&$type=$id ";
       $voies{$street}->{level0} .= $l;
-      if ( $street =~ m{^[a-z]} ) {
+#      if ( $street =~ m{^[a-z]}i ) {
         $level0 .= $l;
-      }
+#      }
       next;
     }
 # on rapproche sur le numéro
@@ -367,12 +431,14 @@ sub osm_cpl {
     }
 # on est en échec
     if ( ! defined $rva->{$adr} ) {
-      if ( $street =~ m{chal Joffre} ) {
+      if ( $street =~ m{.} ) {
         warn "$street $adr";
+        $level0 .= sprintf(",%s%s", substr($type,0,1), $id);
       }
       $osm_inc .= "$ligne\n";
       $voies{$street}->{nb}++;
-      push @{$voies{$street}->{numeros}}, $housenumber;
+      $voies{$street}->{osm}++;
+      push @{$voies{$street}->{'osm_numeros'}}, $housenumber;
       if ( $self->{DEBUG} > 1 ) {
         warn $ligne;
         warn  "\t$rva_id->{$ref}";
@@ -396,7 +462,9 @@ sub osm_cpl {
     if ( defined $modify->{"$type/$id"} ) {
       next;
     }
-    $modify->{"$type/$id"}++;
+    $voies{$voie}->{osm_cpl}++;
+
+    $modify->{"$type/$id"} = $ID_ADR;
     if ( $self->{DEBUG} == 0 ) {
       my $type_osm = $self->{oAPI}->get(sprintf("http://api.openstreetmap.org/api/0.6/%s/%s", $type, $id));
       $osm .= $self->{oOSM}->modify_tags($type_osm, $tags, qw(source:addr source:addr:version source:addr:housenumber:ref addr:city)) . "\n";
@@ -413,10 +481,19 @@ sub osm_cpl {
   $self->{oAPI}->changeset($osm, $self->{osm_commentaire} . ' ajout des tags data.rennes-metropole.fr' , 'modify');
   warn "osm_cpl() nb_osm_ref: " . scalar(keys %{$osm_ref});
   warn "osm_cpl() nb_modify: $nb_modify";
+  my $osm_voies_mod = "type/id;ref";
+  foreach my $mod (sort keys %{$modify} ) {
+    $osm_voies_mod .= sprintf("\n%s;%s", $mod, $modify->{$mod});
+  }
+  my $f_mod = $self->{varDir} . "/osm_voies_mod_${insee}.csv";
+  open(INC, "> :utf8",  $f_mod) or die "...() erreur:$! $f_mod";
+  print(INC $osm_voies_mod);
+  close(INC);
+  warn "osm_ref() fin f_mod $f_mod";
   my $osm_voies_inc = "voie;nb";
   foreach my $voie (sort { $voies{$a}->{rva} <=> $voies{$b}->{rva} } keys %voies) {
 #    printf "%-40s %4d %4d %s\n", $voie, $voies{$voie}->{nb}, $voies{$voie}->{rva}, join(",", @{$voies{$voie}->{numeros}});
-    printf("%-40s %4d %4d %s\n", $voie, $voies{$voie}->{nb}, $voies{$voie}->{rva}, $voies{$voie}->{level0});
+#    printf("%-40s %4d %4d %s\n", $voie, $voies{$voie}->{nb}, $voies{$voie}->{rva}, $voies{$voie}->{level0});
     if ( $voies{$voie}->{rva} > 0 ) {
       $osm_voies_inc .= sprintf("\n%s;%s", $voie, $voies{$voie}->{rva});
     }
@@ -438,7 +515,8 @@ sub osm_cpl {
 #      print "$key;$value\n";
     }
   }
-  print $level0;
+  $level0 = substr($level0,1);
+  print "***level0\n$level0\n";
 #  exit;
 #
 # la partie création des nouveaux points adresse
@@ -458,6 +536,13 @@ sub osm_cpl {
     if ( $ID_ADR !~ m{^\d+$} ) {
       confess;
     }
+    if ( $ADR_CPLETE =~ m{Rue de la Chauminais} ) {
+#      $self->{DEBUG} = 10;
+    }
+    my $numero = "$NUMERO $EXTENSION";
+    $numero =~ s{\s*$}{};
+    $numero = "$numero $BATIMENT";
+    $numero =~ s{\s*$}{};
 # on est très proche d'une autre adresse ?
     $X_WGS84 =~ s{,}{.};
     $Y_WGS84 =~ s{,}{.};
@@ -466,7 +551,7 @@ sub osm_cpl {
       if ( $nodes->{$node}->{ref} =~ m{^\d+$} ) {
         next;
       }
-      my $d =  haversine_distance_meters($nodes->{$node}->{lat}, $nodes->{$node}->{lon}, $Y_WGS84, $X_WGS84);
+      my $d = haversine_distance_meters($nodes->{$node}->{lat}, $nodes->{$node}->{lon}, $Y_WGS84, $X_WGS84);
       if ( $d < 10 ) {
         $ko++;
         if ( $self->{DEBUG} > 2 ) {
@@ -476,9 +561,16 @@ sub osm_cpl {
         }
       }
     }
+    if ( $self->{DEBUG} > 5 ) {
+      warn "$ligne\n";
+      warn "numero:$numero";
+      confess;
+    }
     if ( $ko > 0 ) {
       $rva_inc .= "$ligne\n";
       $voies{$VOIE_NOM}->{nb}++;
+      $voies{$VOIE_NOM}->{rva}++;
+      push @{$voies{$VOIE_NOM}->{'rva_numeros'}}, $numero;
       if ( $self->{DEBUG} > 1 ) {
         warn $ligne;
       }
@@ -501,6 +593,22 @@ sub osm_cpl {
   print(INC $rva_inc);
   close(INC);
   warn "osm_ref() fin $f_inc";
+  my $rva_voies_inc = "voie;nb";
+  printf("%-40s %4s %4s %4s\n", 'voie', 'nb', 'osm', 'rva');
+  foreach my $voie (sort { $voies{$a}->{nb} <=> $voies{$b}->{nb} } keys %voies) {
+    if ( $voies{$voie}->{nb} == 0 ) {
+      next;
+    }
+    printf("%-40s %4d %4d %4d osm_ref:%d osm_cpl:%d\n", $voie, $voies{$voie}->{nb}, $voies{$voie}->{osm}, $voies{$voie}->{rva}, $voies{$voie}->{osm_ref}, $voies{$voie}->{osm_cpl});
+    if ( $voies{$voie}->{nb} >= $self->{seuil} ) {
+      if ( $voies{$voie}->{osm} > 0 ) {
+        printf("\tosm %s\n", join(",", @{$voies{$voie}->{'osm_numeros'}}) );
+      }
+      if ( $voies{$voie}->{rva} > 0 ) {
+        printf("\trva %s\n", join(",", @{$voies{$voie}->{'rva_numeros'}}) );
+      }
+    }
+  }
 }
 #
 # création du noeud point adresse

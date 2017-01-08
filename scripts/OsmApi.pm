@@ -201,11 +201,11 @@ sub osm_get {
   if ( ! -f "$f_osm" or  $self->{DEBUG_GET} > 0 ) {
     $get = "http://www.openstreetmap.org/api/0.6/$get";
     $osm = $self->get($get);
-    open(OSM, ">",  $f_osm) or die "osm_get() erreur:$!";
+    open(OSM, ">:utf8",  $f_osm) or die "osm_get() erreur:$!";
     print(OSM $osm);
     close(OSM);
   } else {
-    $osm = do { open my $fh, '<', $f_osm or die $!; local $/; <$fh> };
+    $osm = do { open my $fh, '<:utf8', $f_osm or die $!; local $/; <$fh> };
   }
 #  confess $osm;
   my $hash = $self->osm2hash($osm);

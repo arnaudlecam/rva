@@ -5,13 +5,18 @@
 # licence : Paternité - Pas d’Utilisation Commerciale 2.0 France (CC BY-NC 2.0 FR)
 #
 # la partie requete http sur l'overpass
+#
+# pour le serveur français
+# http://munin.openstreetmap.fr/problems.html#critical OSM OverpassDB lag
+# http://munin.openstreetmap.fr/osm11.free.org/osm103.openstreetmap.fr/osm_replication_lag_api.html
+# https://trac.openstreetmap.fr/newticket en choisissant le composant "api-fr"
 package OsmOapi;
 use strict;
 use Carp;
 use Data::Dumper;
 use MIME::Base64;
 use URI;
-use HTTP::Request;
+use HTTP::Request::Common;
 # use Net::OAuth;
 use LWP::UserAgent;
 use Encode;
@@ -45,7 +50,7 @@ sub osm_get {
   my ($osm);
 #  $f_osm = "$self->{cfgDir}/relations_routes.osm";
   if ( ! -f "$f_osm" or  $self->{DEBUG_GET} > 0 ) {
-    $osm = $self->get($get);
+    $osm = $self->post($get);
     open(OSM, ">",  $f_osm) or die "osm_get() erreur:$! $f_osm";
     print(OSM $osm);
     close(OSM);
@@ -53,6 +58,7 @@ sub osm_get {
     $osm = do { open my $fh, '<', $f_osm or die $!; local $/; <$fh> };
   }
 #  confess $osm;
+  $self->{osm} = $osm;
   my $hash = $self->osm2hash($osm);
   warn "osm_get() DEBUG_GET:" . $self->{DEBUG_GET} . " $f_osm nb_r:" . scalar(@{$hash->{relation}}) . " nb_w:" . scalar(@{$hash->{way}}) . " nb_n:" . scalar(@{$hash->{node}});
   return $hash;
@@ -64,27 +70,63 @@ sub get {
   my $self = shift;
   my $data = shift;
   warn "get($data)";
+#  $data =~ s{^}{%5E}g;
+#  $data =~ s{#}{%23}g;
   my $url = sprintf('http://overpass-api.de/api/interpreter?data=[timeout:360];%s', $data);
 #  $url = sprintf('http://oapi-fr.openstreetmap.fr/oapi/interpreter?data=[timeout:360];%s', $data);
 #  $url = sprintf('http://overpass.osm.rambler.ru/cgi/interpreter?data=[timeout:360];%s', $data);
-#  $url = sprintf('http://api.openstreetmap.fr/oapi/interpreter?data=[timeout:360][maxsize:1073741824];%s', $data);
+#  $url = sprintf('http://api.openstreetmap.fr/oapi/interpreter?data=[timeout:600][maxsize:1073741824];%s', $data);
   $self->{content} = '';
   my $nb_essai = 3;
   my $req = new HTTP::Request 'GET' => $url;
-  my $res;
+  my ($res);
   while ( $nb_essai-- > 0 ) {
     $res = $self->{ua}->request($req);
     if ($res->is_success) {
       $self->{content} = $res->content;
-    } else {
-      warn "get($url) Error: " . $res->status_line;
+      last;
     }
-    if ( $res->content !~ m{<strong style="color:#FF0000">Error</strong>} ) {
+    warn "get($url) Error: " . $res->status_line;
+    if ($res->status_line !~ m{Error.*429} or $res->content !~ m{<strong style="color:#FF0000">Error</strong>} ) {
       last;
     }
     &now;
     warn $res->content;
     sleep 5;
+  }
+  if ( $self->{content} eq '' ) {
+    warn "get() " .  $res->content;
+    confess "get() nb_essai:$nb_essai";
+  }
+  return $res->content;
+}
+sub post {
+  my $self = shift;
+  my $data = shift;
+  warn "post($data)";
+#  $data =~ s{^}{%5E}g;
+#  $data =~ s{#}{%23}g;
+  my $url = sprintf('http://overpass-api.de/api/interpreter');
+  $self->{content} = '';
+  my $nb_essai = 3;
+  my ($res);
+  while ( $nb_essai-- > 0 ) {
+    $res = $self->{ua}->request(POST $url, [data => $data]);
+    if ($res->is_success) {
+      $self->{content} = $res->content;
+      last;
+    }
+    warn "get($url) Error: " . $res->status_line;
+    if ($res->status_line !~ m{Error.*429} or $res->content !~ m{<strong style="color:#FF0000">Error</strong>} ) {
+      last;
+    }
+    &now;
+    warn $res->content;
+    sleep 5;
+  }
+  if ( $self->{content} eq '' ) {
+    warn "post() " .  $res->content;
+    confess "post() nb_essai:$nb_essai";
   }
   return $res->content;
 }
